@@ -3376,8 +3376,20 @@ void AT86RF215_TX_Alt01_Test(void)
         AT86RF215Write(REG_RF09_CMD, RF_CMD_TRXOFF);
 
     // 2) Radio/BB config
-    AT86RF215TxSetPwr(0x05);                 // a bit more than 0x01 to be visible on SDR
+    //AT86RF215TxSetPwr(0x00);                 // a bit more than 0x01 to be visible on SDR
+
+    AT86RF215TxSetPAC(RF_PAC_0dB_Reduction); //#define RF_PAC_0dB_Reduction             0x03
+    AT86RF215TxSetPAVC(RF_PA_VC_2_0); //SETTING TO 2 VS
+
+       /* set PA power */
+       AT86RF215TxSetPwr(0x05); //0x1f
+
+      // AT86RF215TxSetContinuous(true);
+
+      // AT86RF215SetPHYType(BB_PHY_FSK);
+
     AT86RF215SetPHYType(BB_PHY_FSK);
+    set_fsk_2_mode();
     AT86RF215TxSetDataWhite(false);
     AT86RF215TxSetSR(0x0A);// 0X0A is 400khz and 0x01 is 4000 khz
     AT86RF215TxSetContinuous(true);
@@ -3385,14 +3397,14 @@ void AT86RF215_TX_Alt01_Test(void)
 
     // 3) Payload 0101...
     enum { N = 127 };
-    uint8_t frame[N]; memset(frame, 0x55, N);
+    uint8_t frame[N]; memset(frame, 0x66, N);
 
     AT86RF215Write(REG_BBC0_TXFLL, (uint8_t)(N & 0xFF));
     AT86RF215Write(REG_BBC0_TXFLH, (uint8_t)(N >> 8));
     AT86RF215WriteBuffer(REG_BBC0_FBTXS, frame, (uint8_t)N);   // burst to 0x2800
 
     // 4) Tune and transmit
-    AT86RF215SetChannel(900000000);          // or regional ISM if OTA
+    AT86RF215SetChannel(910000000);          // or regional ISM if OTA
     AT86RF215Write(REG_RF09_CMD, RF_CMD_TXPREP);
     // wait for TXPREP
 
@@ -3581,3 +3593,25 @@ void AT86RF215Set09CWSingleToneTest(void)
 //    printf("current state: %x \n", current_state);
 }
 
+
+void set_fsk_2_mode(void){
+
+    uint8_t val;
+    val= AT86RF215_2FSK;
+
+    val|= AT86RF215_MIDX_7 <<1;
+
+    val|= AT86RF215_MIDXS_88 <<4;
+
+    val|= AT86RF215_FSK_BT_10 <<6;
+
+    AT86RF215Write(REG_BBC0_FSKC0, val);
+
+
+
+    // now we want to set the srate- symbol rate
+    uint8_t value;
+
+    value = AT86RF215_FSK_SRATE_100; // or 100 /200/300/400;
+    AT86RF215Write(REG_BBC0_FSKC1, value);
+}

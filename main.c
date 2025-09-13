@@ -66,7 +66,7 @@
 #include <msp.h>
 #include <stdio.h>
 #include "spi_helper.h"
-#include<regs.h>
+#include <regs.h>
 #include <at86rf215Regs.h>
 
 
@@ -87,6 +87,8 @@ eUSCI_SPI_MasterConfig spiMasterConfig = {
 void AT86RF215Reset( void );
 void ClockInit( void );
 void GpioSetInterrupt( uint_fast8_t port, uint_fast16_t pin, uint_fast8_t irq_mode);
+void FPGA_modulation(void);
+void FPGAreset(void);
 
 
 static void at86_fsk_900_tx_demo(void);
@@ -116,7 +118,6 @@ int main(void)
 
     volatile uint32_t i;
     // Set P1.0 to output direction
-
 
     GPIO_setAsOutputPin(GPIO_PORT_P3, GPIO_PIN0); // CS
     //GPIO_setOutputHighOnPin(GPIO_PORT_P3, GPIO_PIN0); // idle high
@@ -152,7 +153,8 @@ int main(void)
 
      uint8_t version = AT86RF215Read(REG_RF_VN );
 
-     printf("version = %x",version);
+     printf("version = %x\n"
+             "",version);
                     fflush(stdout);
      while (version != 0x03)
      {
@@ -163,12 +165,17 @@ int main(void)
          delay_us(1000);
          version = AT86RF215Read(REG_RF_VN);
      }
-      modem_state = AT86RF215_RF09; // for 09 command
+      modem_state = AT86RF215_RF09; // for 09 command // modem is set here
 
       printf("starting to communicate");
       fflush(stdout);
-     AT86RF215_TX_Alt01_Test();
 
+      /* Below function is for testing using the internal modulation capability of AT86*/
+//     AT86RF215_TX_Alt01_Test();
+
+     FPGA_modulation();
+//
+//     FPGAreset();
 
      while(1){
 
@@ -227,7 +234,32 @@ void AT86RF215Reset( void )
 }
 
 
+void FPGA_modulation(void){
 
+    // modem state is set in the main function itself.
+
+    AT86RF215TxSetIQ(900000000);
+    delay_ms(1);
+    AT86RF215SetState(RF_CMD_TX);
+
+    while(1)
+        {
+
+        }
+
+}
+
+void FPGAreset(void){
+    GPIO_setOutputHighOnPin(GPIO_PORT_P3, GPIO_PIN7);
+       /* Wait typical time of timer TR1. */
+       delay_us(300);
+       /* Set RESET pin to 0 */
+       GPIO_setOutputLowOnPin(GPIO_PORT_P3, GPIO_PIN7);
+       /* Wait 10 us */
+       delay_us(300);
+       GPIO_setOutputHighOnPin(GPIO_PORT_P3, GPIO_PIN7);
+       delay_us(1000);
+}
 
 
 

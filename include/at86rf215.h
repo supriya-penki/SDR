@@ -859,6 +859,10 @@ at86rf215_iq_conf(struct at86rf215 *h, at86rf215_radio_t radio,
     void AT86RF215TxSetFrameLength(uint16_t FrameLen);
     void AT86RF215_TX_Alt01_Test(void);
     void AT86RF215Set09CWSingleToneTest(void);
+//    void AT86RF215TxSetPAC(uint8_t PAC);
+//    void AT86RF215TxSetPAVC(uint8_t PAVC);
+//    void AT86RF215TxSetCutOff(uint8_t TXCUTOFF);
+    void set_fsk_2_mode(void);
 
 
 #ifdef __cplusplus
