@@ -847,6 +847,7 @@ at86rf215_iq_conf(struct at86rf215 *h, at86rf215_radio_t radio,
     void AT86RF215TxSetSR(uint8_t TXSR);
     void bitWrite(uint16_t addr, uint8_t pos, uint8_t newValue);
     void AT86RF215SetIRQMask(bool status, uint8_t pos);
+    void iq_config(void);
 
 
 
@@ -863,6 +864,9 @@ at86rf215_iq_conf(struct at86rf215 *h, at86rf215_radio_t radio,
 //    void AT86RF215TxSetPAVC(uint8_t PAVC);
 //    void AT86RF215TxSetCutOff(uint8_t TXCUTOFF);
     void set_fsk_2_mode(void);
+    void AT86RF215SetCLKO(uint8_t clko);
+    void AT86RF215TxSetIQNew(uint32_t freq);
+    void AT86RF215TxSetIQ_old(uint32_t freq);
 
 
 #ifdef __cplusplus

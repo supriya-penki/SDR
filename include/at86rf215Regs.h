@@ -82,7 +82,9 @@ Maintainers:	Mehrdad Hessar, Ali Najafi
 //#define REG_RF_CLKO							0x0007
 //
 ///* CLKO values */
-//#define RF_CLKO_OFF					0x00
+#define RF_CLKO_OFF					0x00
+#define RF_CLKO_26MHZ   0x1
+#define RF_CLKO_32MHZ   0x2
 ////TODO: rest
 //
 ///* bandwidth */

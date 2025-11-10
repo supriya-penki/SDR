@@ -2905,6 +2905,9 @@ int at86rf215_rx(struct at86rf215 *h, at86rf215_radio_t radio,
  * @param conf IQ configration
  * @return 0 on success or negative error code
  */
+
+
+
 int at86rf215_iq_conf(struct at86rf215 *h, at86rf215_radio_t radio,
                       const struct at86rf215_iq_conf *conf)
 {
@@ -3036,11 +3039,172 @@ void AT86RF215ReadBuffer(uint16_t addr, uint8_t *buffer, uint8_t size)
 
 
 
+void AT86RF215TxSetIQNew(uint32_t freq)
+{
+    uint8_t current_state = AT86RF215GetState();
+ printf("current_state: %x\n", current_state);
+fflush(stdout);
+
+    if (current_state != RF_STATE_TRXOFF)
+        AT86RF215SetState(RF_CMD_TRXOFF);
+
+    /* set RF_IQIFC1 RF mode */
+    AT86RF215SetRFMode(RF_MODE_RF);
+
+   // AT86RF215TxSetDirectMod(true); // should we do this?
+
+    uint8_t ret = 0;
+
+       ret = AT86RF215Read(REG_RF_IQIFC1);
+       ret = (ret & 0x3) | (AT86RF215_RF_MODE_RF << 4);
+       AT86RF215Write(REG_RF_IQIFC1, ret);
+       // after this setting the other configurations
+       struct at86rf215_iq_conf conf =
+       { .eec = 1, // use internal clock .cmv1v2 = 1, // 1.2 V CM ref
+         .cmv = AT86RF215_LVDS_CMV200, // 200 mV swing ---------------------------- this field is ignored anyways
+         .drv = AT86RF215_LVDS_DRV2, // mid drive
+         .extlb = 0, // no loopback .skedrv = 0, // default
+         .trcut = AT86RF215_RCUT_25FS2, // 0.5×Fs cutoff
+         .tsr = RF_SR4000, // 4 Msps TX sample rate
+         .rrcut = AT86RF215_RCUT_25FS2, // (if you care about RX too)
+         .rsr = RF_SR4000 // RX sample rate (match TX)
+         };
+         uint8_t val = conf.eec | (conf.cmv1v2 << 1) | (conf.cmv << 2) | (conf.drv << 4) | (conf.extlb << 7); // cmv1v2 is by default set to 1------------------------> that's what is needed for our case
+
+         AT86RF215Write(REG_RF_IQIFC0,val);
+
+         val= AT86RF215Read(REG_RF_IQIFC1);
+
+         val &= BIT(4) | BIT(5) | BIT(6); val |= conf.skedrv;
+
+         AT86RF215Write( REG_RF_IQIFC1, val);
+
+         const uint8_t tval = (conf.trcut << 5) | ((0 & 0x1) << 4) | conf.tsr;
+
+         AT86RF215Write( REG_RF09_TXDFE, tval);
+
+         const uint8_t rval = (conf.rrcut << 5) | conf.rsr;
+
+         AT86RF215Write(REG_RF09_RXDFE, rval);
+
+    AT86RF215SetChannel(freq);
+
+    /* PA current setting */
+    AT86RF215TxSetPAC(RF_PAC_3dB_Reduction);
+
+    /* PA DC voltage */
+//    AT86RF215TxSetPAVC(RF_PA_VC_2_4);
+    AT86RF215TxSetPAVC(RF_PA_VC_2_2);
+
+    /* PA power */
+   // AT86RF215TxSetPwr(31); // 31 DB is max power output
+    AT86RF215TxSetPwr(10);
+
+    /* set sampling rate */
+    AT86RF215TxSetSR(RF_SR4000);
+
+    /* set cut-off frequency */
+    AT86RF215TxSetCutOff(RF_CUT_4_4);
+
+    /* set IRQ Mask */
+    AT86RF215SetIRQMask(true, RF_IRQM_TRXRDY);
+    AT86RF215SetIRQMask(false, RF_IRQM_WAKEUP);
+    AT86RF215SetIRQMask(true, RF_IRQM_IQIFSF);
+
+    uint8_t mask = AT86RF215Read(REG_RF09_IRQM);
+//    printf("mask: %x\n", mask);
+
+    uint8_t PAC = AT86RF215Read(REG_RF09_PAC);
+//    printf("PAC: %x\n", PAC);
+
+    uint8_t AUXS = AT86RF215Read(REG_RF09_AUXS);
+//    printf("AUXS: %x\n", AUXS);
+
+    /* set transmit mode */
+    //AT86RF215SetState(RF_CMD_TXPREP);
+    AT86RF215Write(REG_RF09_CMD, RF_CMD_TXPREP);
+
+    /* read state */
+    current_state = AT86RF215GetState();
+    printf("current_state after : %x\n", current_state);
+}
+
+
+
 void AT86RF215TxSetIQ(uint32_t freq)
 {
     uint8_t current_state = AT86RF215GetState();
+    //printf("current_state: %x\n", current_state);
+
+    if (current_state != RF_STATE_TRXOFF)
+        AT86RF215SetState(RF_CMD_TRXOFF);
+
+
+         struct at86rf215_iq_conf conf =
+              { .eec = 0, // use internal clock .cmv1v2 = 1, // 1.2 V CM ref
+                .cmv = AT86RF215_LVDS_CMV200, // 200 mV swing
+                .drv = AT86RF215_LVDS_DRV2, // mid drive
+                .extlb = 0 ,// no loopback .skedrv = 0, // default 1 - to test lvds interface using loopback
+                .trcut = AT86RF215_RCUT_25FS2, // 0.5×Fs cutoff
+                .tsr = RF_SR4000, // 4 Msps TX sample rate
+                .rrcut = AT86RF215_RCUT_25FS2, // (if you care about RX too)
+                .rsr = RF_SR4000 ,// RX sample rate (match TX)
+                .cmv1v2 = 1
+                };
+                uint8_t val = conf.eec | (conf.cmv1v2 << 1) | (conf.cmv << 2) | (conf.drv << 4) | (conf.extlb << 7);
+
+                AT86RF215Write(REG_RF_IQIFC0,val);
+
+
+    /* set RF_IQIFC1 RF mode */
+    AT86RF215SetRFMode(RF_MODE_RF);
+
+    AT86RF215SetChannel(freq);
+
+    /* PA current setting */
+    AT86RF215TxSetPAC(RF_PAC_3dB_Reduction);
+
+    /* PA DC voltage */
+//    AT86RF215TxSetPAVC(RF_PA_VC_2_4);
+    AT86RF215TxSetPAVC(RF_PA_VC_2_2);
+
+    /* PA power */
+    AT86RF215TxSetPwr(0x05);
+
+    /* set sampling rate */
+    AT86RF215TxSetSR(RF_SR4000);
+
+    /* set cut-off frequency */
+    AT86RF215TxSetCutOff(RF_CUT_4_4);
+
+    /* set IRQ Mask */
+    AT86RF215SetIRQMask(true, RF_IRQM_TRXRDY);
+    AT86RF215SetIRQMask(false, RF_IRQM_WAKEUP);
+    AT86RF215SetIRQMask(true, RF_IRQM_IQIFSF);
+
+    uint8_t mask = AT86RF215Read(REG_RF09_IRQM);
+//    printf("mask: %x\n", mask);
+
+    uint8_t PAC = AT86RF215Read(REG_RF09_PAC);
+//    printf("PAC: %x\n", PAC);
+
+    uint8_t AUXS = AT86RF215Read(REG_RF09_AUXS);
+//    printf("AUXS: %x\n", AUXS);
+
+    /* set transmit mode */
+    AT86RF215SetState(RF_CMD_TXPREP);
+
+    /* read state */
+    current_state = AT86RF215GetState();
+    //printf("current_state after : %x\n", current_state);
+}
+
+
+
+void AT86RF215TxSetIQ_old(uint32_t freq)
+{
+    uint8_t current_state = AT86RF215GetState();
     printf("current_state: %x\n", current_state);
-    fflush(stdout);
 
     if (current_state != RF_STATE_TRXOFF)
         AT86RF215SetState(RF_CMD_TRXOFF);
@@ -3058,8 +3222,7 @@ void AT86RF215TxSetIQ(uint32_t freq)
     AT86RF215TxSetPAVC(RF_PA_VC_2_2);
 
     /* PA power */
-   // AT86RF215TxSetPwr(31); // 31 DB is max power output
-    AT86RF215TxSetPwr(2);
+    AT86RF215TxSetPwr(31);
 
     /* set sampling rate */
     AT86RF215TxSetSR(RF_SR4000);
@@ -3088,6 +3251,8 @@ void AT86RF215TxSetIQ(uint32_t freq)
 //    current_state = AT86RF215GetState();
 //    printf("current_state after : %x\n", current_state);
 }
+
+
 
 
 
@@ -3614,4 +3779,59 @@ void set_fsk_2_mode(void){
 
     value = AT86RF215_FSK_SRATE_100; // or 100 /200/300/400;
     AT86RF215Write(REG_BBC0_FSKC1, value);
+}
+
+
+
+void iq_config(void){
+    /* read state */ // current_state = AT86RF215GetState();
+    // printf("current_state after : %x\n", current_state); }
+    // set the chip mode first
+  // printf("in the what\n");
+  // fflush(stdout);
+
+   uint8_t ret = 0;
+
+   ret = AT86RF215Read(REG_RF_IQIFC1);
+   ret = (ret & 0x3) | (AT86RF215_RF_MODE_RF << 4); AT86RF215Write(REG_RF_IQIFC1, ret);
+   // after this setting the other configurations
+   struct at86rf215_iq_conf conf =
+   { .eec = 0, // use internal clock .cmv1v2 = 1, // 1.2 V CM ref
+     .cmv = AT86RF215_LVDS_CMV200, // 200 mV swing
+     .drv = AT86RF215_LVDS_DRV2, // mid drive
+     .extlb = 0, // no loopback .skedrv = 0, // default
+     .trcut = AT86RF215_RCUT_25FS2, // 0.5×Fs cutoff
+     .tsr = RF_SR4000, // 4 Msps TX sample rate
+     .rrcut = AT86RF215_RCUT_25FS2, // (if you care about RX too)
+     .rsr = RF_SR4000 // RX sample rate (match TX)
+     };
+     uint8_t val = conf.eec | (conf.cmv1v2 << 1) | (conf.cmv << 2) | (conf.drv << 4) | (conf.extlb << 7);
+
+     AT86RF215Write(REG_RF_IQIFC0,val);
+
+     val= AT86RF215Read(REG_RF_IQIFC1);
+
+     val &= BIT(4) | BIT(5) | BIT(6); val |= conf.skedrv;
+
+     AT86RF215Write( REG_RF_IQIFC1, val);
+
+     const uint8_t tval = (conf.trcut << 5) | ((0 & 0x1) << 4) | conf.tsr;
+
+     AT86RF215Write( REG_RF09_TXDFE, tval);
+
+     const uint8_t rval = (conf.rrcut << 5) | conf.rsr;
+
+     AT86RF215Write(REG_RF09_RXDFE, rval);
+}
+   //};
+
+
+
+void AT86RF215SetCLKO(uint8_t clko)
+{
+    clko &= 0x07;
+        uint8_t current_reg = AT86RF215Read(REG_RF_CLKO);
+        current_reg &= 0xF8;
+        current_reg += clko;
+        AT86RF215Write(REG_RF_CLKO, current_reg);
 }
